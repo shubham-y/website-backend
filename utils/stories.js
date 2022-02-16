@@ -1,4 +1,3 @@
-
 const { getUsername, getUserId } = require('./users')
 const { fetchTask } = require('../models/tasks')
 const logger = require('./logger')
@@ -9,8 +8,7 @@ const fromFirestoreData = async (story) => {
     if (!story) {
       return story
     }
-
-    let { featureOwner, backendEngineer, frontendEngineer } = story
+    let { featureOwner, backendEngineer, frontendEngineer } = story.attributes
 
     const promises = [featureOwner, backendEngineer, frontendEngineer].map(async (userId) => {
       const username = await getUsername(userId)
@@ -18,9 +16,9 @@ const fromFirestoreData = async (story) => {
     });
     [featureOwner, backendEngineer, frontendEngineer] = await Promise.all(promises)
 
-    if (featureOwner) story.featureOwner = featureOwner
-    if (backendEngineer) story.backendEngineer = backendEngineer
-    if (frontendEngineer) story.frontendEngineer = frontendEngineer
+    if (featureOwner) story.attributes.featureOwner = featureOwner
+    if (backendEngineer) story.attributes.backendEngineer = backendEngineer
+    if (frontendEngineer) story.attributes.frontendEngineer = frontendEngineer
 
     return {
       ...story

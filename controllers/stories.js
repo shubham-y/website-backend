@@ -33,14 +33,13 @@ const addNewStory = async (req, res) => {
  */
 const fetchStories = async (req, res) => {
   try {
-    const allStories = await stories.fetchStories()
+    const allStories = await stories.fetchStories(req.query)
     return res.json({
-      message: 'Stories returned successfully!',
-      stories: allStories.length > 0 ? allStories : []
+      data: allStories.length > 0 ? allStories : []
     })
   } catch (err) {
     logger.error(`Error while fetching stories ${err}`)
-    return res.boom.badImplementation('An internal server error occurred')
+    return res.status(500)
   }
 }
 

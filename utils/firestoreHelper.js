@@ -9,8 +9,9 @@ const snapshotToArray = (snapshot, initialArray = []) => {
   if (!snapshot.empty) {
     snapshot.forEach((doc) => {
       initialArray.push({
+        type: 'stories',
         id: doc.id,
-        ...doc.data()
+        attributes: { ...doc.data() }
       })
     })
   }
