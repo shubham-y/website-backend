@@ -1,5 +1,4 @@
 const chai = require("chai");
-const sinon = require("sinon");
 const { expect } = chai;
 const chaiHttp = require("chai-http");
 
@@ -11,11 +10,17 @@ const userModel = require("../../models/users");
 const config = require("config");
 const cookieName = config.get("userToken.cookieName");
 const userData = require("../fixtures/user/user")();
-const { DINERO, NEELAM } = require("../../constants/wallets");
+const taskData = require("../fixtures/task/task")();
 const cleanDb = require("../utils/cleanDb");
 chai.use(chaiHttp);
 
 const appOwner = userData[3];
+const activeTask = taskData[0];
+const completedTask = taskData[1];
+const createTask = taskData[2];
+const createTaskWithDummyAssignee = taskData[3];
+const createTaskWithDummyParticipant = taskData[4];
+const assignedTask = taskData[5];
 
 let jwt;
 
@@ -26,148 +31,16 @@ describe("Tasks", function () {
     const userId = await addUser(appOwner);
     jwt = authService.generateAuthToken({ userId });
 
-    const taskData = [
-      {
-        title: "Test task",
-        type: "feature",
-        endsOn: 1234,
-        startedOn: 4567,
-        status: "active",
-        percentCompleted: 10,
-        participants: [],
-        assignee: appOwner.username,
-        completionAward: { [DINERO]: 3, [NEELAM]: 300 },
-        lossRate: { [DINERO]: 1 },
-        isNoteworthy: true,
-      },
-      {
-        title: "Test task",
-        purpose: "To Test mocha",
-        featureUrl: "<testUrl>",
-        type: "group",
-        links: ["test1"],
-        endsOn: 1234,
-        startedOn: 54321,
-        status: "completed",
-        percentCompleted: 10,
-        dependsOn: ["d12", "d23"],
-        participants: [appOwner.username],
-        completionAward: { [DINERO]: 3, [NEELAM]: 300 },
-        lossRate: { [DINERO]: 1 },
-        isNoteworthy: false,
-      },
-    ];
-
     // Add the active task
-    taskId = (await tasks.updateTask(taskData[0])).taskId;
+    taskId = (await tasks.updateTask(activeTask)).taskId;
     taskId1 = taskId;
 
     // Add the completed task
-    taskId = (await tasks.updateTask(taskData[1])).taskId;
+    taskId = (await tasks.updateTask(completedTask)).taskId;
   });
 
   after(async function () {
     await cleanDb();
-  });
-
-  afterEach(async function () {
-    sinon.restore();
-  });
-
-  describe("POST /tasks - creates a new task", function () {
-    it("Should return success response after adding the task", function (done) {
-      chai
-        .request(app)
-        .post("/tasks")
-        .set("cookie", `${cookieName}=${jwt}`)
-        .send({
-          title: "Test task - Create",
-          type: "feature",
-          endsOn: 123,
-          startedOn: 456,
-          status: "completed",
-          percentCompleted: 10,
-          completionAward: { [DINERO]: 3, [NEELAM]: 300 },
-          lossRate: { [DINERO]: 1 },
-          assignee: appOwner.username,
-          participants: [],
-        })
-        .end((err, res) => {
-          if (err) {
-            return done(err);
-          }
-          expect(res).to.have.status(200);
-          expect(res.body).to.be.a("object");
-          expect(res.body.message).to.equal("Task created successfully!");
-          expect(res.body.id).to.be.a("string");
-          expect(res.body.task).to.be.a("object");
-          expect(res.body.task.createdBy).to.equal(appOwner.username);
-          expect(res.body.task.assignee).to.equal(appOwner.username);
-          expect(res.body.task.participants).to.be.a("array");
-          return done();
-        });
-    });
-    it("Should return 400 if assignee username does not exist", function (done) {
-      chai
-        .request(app)
-        .post("/tasks")
-        .set("cookie", `${cookieName}=${jwt}`)
-        .send({
-          title: "Test task - Create",
-          type: "feature",
-          endsOn: 123,
-          startedOn: 456,
-          status: "completed",
-          percentCompleted: 10,
-          completionAward: { [DINERO]: 3, [NEELAM]: 300 },
-          lossRate: { [DINERO]: 1 },
-          assignee: "dummyUser",
-          participants: [],
-        })
-        .end((err, res) => {
-          if (err) {
-            return done(err);
-          }
-          expect(res).to.have.status(400);
-          expect(res.body).to.be.a("object");
-          expect(res.body.message).to.equal("User not found");
-          return done();
-        });
-    });
-    it("Should not return invalid username in participants", function (done) {
-      chai
-        .request(app)
-        .post("/tasks")
-        .set("cookie", `${cookieName}=${jwt}`)
-        .send({
-          title: "Test task - Create",
-          type: "group",
-          endsOn: 123,
-          startedOn: 456,
-          status: "completed",
-          percentCompleted: 10,
-          completionAward: { [DINERO]: 3, [NEELAM]: 300 },
-          lossRate: { [DINERO]: 1 },
-          assignee: appOwner.username,
-          participants: ["dummyUser"],
-        })
-        .end((err, res) => {
-          if (err) {
-            return done(err);
-          }
-          expect(res).to.have.status(200);
-          expect(res.body).to.be.a("object");
-          expect(res.body.message).to.equal("Task created successfully!");
-          expect(res.body.id).to.be.a("string");
-          expect(res.body.task).to.be.a("object");
-          expect(res.body.task.createdBy).to.equal(appOwner.username);
-          expect(res.body.task.assignee).to.equal(appOwner.username);
-          expect(res.body.task.participants).to.be.an("array");
-          expect(res.body.task.participants).to.have.a.lengthOf(0);
-
-          return done();
-        });
-    });
   });
 
   describe("GET /tasks", function () {
@@ -190,6 +63,69 @@ describe("Tasks", function () {
           } else {
             expect(taskWithParticipants.assignee).to.equal(appOwner.username);
           }
+
+          return done();
+        });
+    });
+  });
+
+  describe("POST /tasks - creates a new task", function () {
+    it("Should return success response after adding the task", function (done) {
+      chai
+        .request(app)
+        .post("/tasks")
+        .set("cookie", `${cookieName}=${jwt}`)
+        .send(createTask)
+        .end((err, res) => {
+          if (err) {
+            return done(err);
+          }
+          expect(res).to.have.status(200);
+          expect(res.body).to.be.a("object");
+          expect(res.body.message).to.equal("Task created successfully!");
+          expect(res.body.id).to.be.a("string");
+          expect(res.body.task).to.be.a("object");
+          expect(res.body.task.createdBy).to.equal(appOwner.username);
+          expect(res.body.task.assignee).to.equal(appOwner.username);
+          expect(res.body.task.participants).to.be.a("array");
+          return done();
+        });
+    });
+    it("Should return 400 if assignee username does not exist", function (done) {
+      chai
+        .request(app)
+        .post("/tasks")
+        .set("cookie", `${cookieName}=${jwt}`)
+        .send(createTaskWithDummyAssignee)
+        .end((err, res) => {
+          if (err) {
+            return done(err);
+          }
+          expect(res).to.have.status(400);
+          expect(res.body).to.be.a("object");
+          expect(res.body.message).to.equal("User not found");
+          return done();
+        });
+    });
+    it("Should not return invalid username in participants", function (done) {
+      chai
+        .request(app)
+        .post("/tasks")
+        .set("cookie", `${cookieName}=${jwt}`)
+        .send(createTaskWithDummyParticipant)
+        .end((err, res) => {
+          if (err) {
+            return done(err);
+          }
+          expect(res).to.have.status(200);
+          expect(res.body).to.be.a("object");
+          expect(res.body.message).to.equal("Task created successfully!");
+          expect(res.body.id).to.be.a("string");
+          expect(res.body.task).to.be.a("object");
+          expect(res.body.task.createdBy).to.equal(appOwner.username);
+          expect(res.body.task.assignee).to.equal(appOwner.username);
+          expect(res.body.task.participants).to.be.an("array");
+          expect(res.body.task.participants).to.have.a.lengthOf(0);
 
           return done();
         });
@@ -241,22 +177,6 @@ describe("Tasks", function () {
         github_id: "prakashchoudhary07",
         username: "user1",
       });
-      const assignedTask = {
-        title: "Assigned task",
-        purpose: "To Test mocha",
-        featureUrl: "<testUrl>",
-        type: "group",
-        links: ["test1"],
-        endsOn: "<unix timestamp>",
-        startedOn: "<unix timestamp>",
-        status: "active",
-        percentCompleted: 10,
-        dependsOn: ["d12", "d23"],
-        participants: ["user1"],
-        completionAward: { [DINERO]: 3, [NEELAM]: 300 },
-        lossRate: { [DINERO]: 1 },
-        isNoteworthy: true,
-      };
       const { taskId } = await tasks.updateTask(assignedTask);
       const res = await chai
         .request(app)
